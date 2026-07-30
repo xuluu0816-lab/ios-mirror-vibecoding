@@ -356,13 +356,39 @@ function startRecording(){
   }catch(e){showToast('录制失败: '+e.message)}
 }
 function stopRecording(){if(mediaRecorder&&isRecording){mediaRecorder.stop();btnMCap.style.borderColor='';btnMCap.querySelector('.shutter-inner').style.background=''}}
-function doCap(mir){flashEl.classList.add('flash-active');setTimeout(function(){flashEl.classList.remove('flash-active')},400);showToast(mir?'镜子定格已保存':'补光照已保存至相册')}
+// Hidden canvas for photo capture
+var capCanvas=document.createElement('canvas');
+var capCtx=capCanvas.getContext('2d');
+
+function doCap(mir){
+  flashEl.classList.add('flash-active');
+  setTimeout(function(){flashEl.classList.remove('flash-active')},400);
+  // Get the active video stream
+  var vid=mir?mirStreamEl:camStreamEl;
+  if(vid&&vid.style.display!=='none'&&vid.videoWidth){
+    capCanvas.width=vid.videoWidth;capCanvas.height=vid.videoHeight;
+    capCtx.save();
+    // Mirror mode: flip horizontally (since mirror stream is already mirrored)
+    if(mir){capCtx.scale(-1,1);capCtx.drawImage(vid,-vid.videoWidth,0,vid.videoWidth,vid.videoHeight)}
+    else{capCtx.scale(-1,1);capCtx.drawImage(vid,-vid.videoWidth,0,vid.videoWidth,vid.videoHeight)}
+    capCtx.restore();
+    capCanvas.toBlob(function(blob){
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement('a');a.href=url;
+      a.download='MirrorGlow_'+new Date().toISOString().replace(/[:.]/g,'-').slice(0,19)+'.jpg';
+      document.body.appendChild(a);a.click();document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(mir?'镜子照片已保存':'补光照片已保存');
+    },'image/jpeg',0.92);
+  }else{
+    showToast(mir?'镜子定格已保存':'补光照已保存至相册');
+  }
+}
 
 btnMCap.addEventListener('pointerdown',function(e){e.stopPropagation();mcLPtimer=setTimeout(function(){startRecording()},600)});
 btnMCap.addEventListener('pointerup',function(e){e.stopPropagation();clearTimeout(mcLPtimer);if(!isRecording)doCap(true)});
 btnMCap.addEventListener('pointerleave',function(){clearTimeout(mcLPtimer);if(isRecording)stopRecording()});
 btnCap.addEventListener('click',function(){doCap(false)});
-// Long press on mirror capture for video
 btnMCap.addEventListener('click',function(e){if(isRecording){e.stopPropagation();stopRecording()}});
 
 renderDots();applyBg();startCam(true);
